@@ -6,6 +6,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * A bookmark in one sorted run file. It remembers the line we are currently
+ * looking at, and can move on to the next one.
+ * The merge keeps one cursor per run and always asks: "which cursor is on the smallest line?"
+ */
 public class RunCursor {
 
     public final BufferedReader reader;

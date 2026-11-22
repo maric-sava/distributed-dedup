@@ -12,6 +12,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Phase 1 of external sort: cuts the input into runs.
+ * A run = as many lines as fit in the memory budget, sorted, written to its own file.
+ * Example with room for 3 lines:  d b c a e  ->  run 0: b c d,  run 1: a e
+ */
 public class RunWriter {
 
     private final long budgetBytes;
@@ -20,6 +25,12 @@ public class RunWriter {
         this.budgetBytes = budgetBytes;
     }
 
+    /**
+     * Makes ONE run: reads lines until the budget is used up (or the input ends),
+     * sorts them and writes them to runFile.
+     * Returns how many lines it wrote; 0 means the input was already finished.
+     * The same reader is passed on every call, so each call continues where the last stopped.
+     */
     public int writeRun(BufferedReader reader, Path runFile) throws IOException {
         List<String> lines = new ArrayList<>();
         long used = 0;
@@ -41,6 +52,11 @@ public class RunWriter {
         return lines.size();
     }
 
+    /**
+     * Makes ALL runs: calls writeRun again and again until the input is finished.
+     * The files are named run-0.txt, run-1.txt, ... inside runDir.
+     * Returns the list of run files, in order.
+     */
     public List<Path> writeAllRuns(Path input, Path runDir) throws IOException {
         Files.createDirectories(runDir);
         List<Path> runs = new ArrayList<>();
