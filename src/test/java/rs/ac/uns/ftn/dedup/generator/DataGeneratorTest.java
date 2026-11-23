@@ -7,8 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class DataGeneratorTest {
 
@@ -39,5 +38,16 @@ public class DataGeneratorTest {
         generator.generate(config, out1);
         generator.generate(config, out2);
         assertArrayEquals(Files.readAllBytes(out1), Files.readAllBytes(out2));
+    }
+
+    @Test
+    void zipfMakesFirstRecordVeryFrequent() throws IOException {
+        Path out = dir.resolve("zipf.txt");
+        new DataGenerator().generate(new GeneratorConfig(10_000, 100, Distribution.ZIPF, 1), out);
+
+        long firstCount = Files.readAllLines(out).stream().filter(line -> line.equals("user_0")).count();
+
+        // uniform would give about 100 of 10,000; Zipf gives about 1,900
+        assertTrue(firstCount > 1000, "user_0 count: " + firstCount);
     }
 }

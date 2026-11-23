@@ -2,7 +2,7 @@ package rs.ac.uns.ftn.dedup.generator;
 
 import java.util.Random;
 
-public class UniformDistribution {
+public class UniformDistribution implements IdSource {
 
     private final int distinct;
     private final Random random;
@@ -12,6 +12,7 @@ public class UniformDistribution {
         this.random = new Random(seed); // same seed -> same sequence
     }
 
+    @Override
     public int nextId() {
         return random.nextInt(distinct);
     }
