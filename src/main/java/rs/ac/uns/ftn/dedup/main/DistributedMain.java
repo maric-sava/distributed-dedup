@@ -7,14 +7,15 @@ import java.util.List;
 import java.util.Locale;
 import rs.ac.uns.ftn.dedup.distributed.DistributedDeduplicator;
 import rs.ac.uns.ftn.dedup.distributed.JobStats;
+import rs.ac.uns.ftn.dedup.distributed.partition.PartitionStrategy;
 import rs.ac.uns.ftn.dedup.local.hash.HashPartitionDeduplicator;
 
 /** Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets> */
 public class DistributedMain {
 
     public static void main(String[] args) throws IOException {
-        if (args.length < 5 || args.length > 6) {
-            System.err.println("Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets> [combiner]");
+        if (args.length < 5) {
+            System.err.println("Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets> [combiner] [range]");
             System.exit(1);
         }
         Path input = Path.of(args[0]);
@@ -22,10 +23,12 @@ public class DistributedMain {
         int nodes = Integer.parseInt(args[2]);
         long budget = Long.parseLong(args[3]);
         int buckets = Integer.parseInt(args[4]);
-        boolean combiner = args.length == 6 && args[5].equals("combiner");
+        List<String> options = List.of(args).subList(5, args.length);
+        boolean combiner = options.contains("combiner");
+        PartitionStrategy strategy = options.contains("range") ? PartitionStrategy.RANGE : PartitionStrategy.HASH;
 
         DistributedDeduplicator job =
-                new DistributedDeduplicator(nodes, budget, new HashPartitionDeduplicator(budget, buckets), combiner);
+                new DistributedDeduplicator(nodes, budget, new HashPartitionDeduplicator(budget, buckets), combiner, strategy);
 
         job.dedupe(input, output);
 

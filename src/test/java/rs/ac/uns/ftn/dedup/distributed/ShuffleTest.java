@@ -12,6 +12,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import rs.ac.uns.ftn.dedup.distributed.partition.HashNodePartitioner;
+import rs.ac.uns.ftn.dedup.distributed.partition.NodePartitioner;
 import rs.ac.uns.ftn.dedup.local.hash.LineHash;
 
 class ShuffleTest {
@@ -52,7 +54,7 @@ class ShuffleTest {
         int total = 0;
         for (Node node : nodes) {
             for (String line : receivedBy(node)) {
-                assertEquals(node.id(), LineHash.bucket(line, ShuffleSplitter.SHUFFLE_SEED, 3));
+                assertEquals(node.id(), LineHash.bucket(line, HashNodePartitioner.SHUFFLE_SEED, 3));
                 total++;
             }
         }
@@ -70,5 +72,28 @@ class ShuffleTest {
 
         assertEquals(6, transport.filesSent()); // each of 3 nodes sends to the 2 others
         assertTrue(transport.bytesSent() < totalInputBytes);
+    }
+
+    @Test
+    void usesTheGivenPartitioner() throws IOException {
+        NodePartitioner everythingToNodeZero = (source, input, nodeCount) -> {
+            List<Path> parts = new ArrayList<>();
+            for (int i = 0; i < nodeCount; i++) {
+                Path part = source.folder().resolve("fake-part-" + i + ".txt");
+                if (i == 0) {
+                    Files.copy(input, part);
+                } else {
+                    Files.writeString(part, "");
+                }
+                parts.add(part);
+            }
+            return parts;
+        };
+
+        new Shuffle(transport, everythingToNodeZero).run(nodes);
+
+        assertEquals(90, receivedBy(nodes.get(0)).size()); // all 3 x 30 lines
+        assertEquals(0, receivedBy(nodes.get(1)).size());
+        assertEquals(0, receivedBy(nodes.get(2)).size());
     }
 }

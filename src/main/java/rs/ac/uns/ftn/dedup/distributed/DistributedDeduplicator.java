@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 import rs.ac.uns.ftn.dedup.core.Deduplicator;
+import rs.ac.uns.ftn.dedup.distributed.partition.*;
 import rs.ac.uns.ftn.dedup.distributed.setup.InputSpreader;
 
 /** Distributed deduplication on simulated nodes: spread, shuffle by hash, dedupe on every node. */
@@ -22,15 +23,26 @@ public class DistributedDeduplicator implements Deduplicator {
     private final boolean useCombiner;
     private long timeMillis;
 
+    private static final int SAMPLE_SIZE_PER_NODE = 1000;
+    private static final long SAMPLE_SEED = 42;
+
+    private final PartitionStrategy strategy;
+
     public DistributedDeduplicator(int nodeCount, long nodeBudgetBytes, Deduplicator local) {
         this(nodeCount, nodeBudgetBytes, local, false);
     }
 
     public DistributedDeduplicator(int nodeCount, long nodeBudgetBytes, Deduplicator local, boolean useCombiner) {
+        this(nodeCount, nodeBudgetBytes, local, useCombiner, PartitionStrategy.HASH);
+    }
+
+    public DistributedDeduplicator(int nodeCount, long nodeBudgetBytes, Deduplicator local,
+            boolean useCombiner, PartitionStrategy strategy) {
         this.nodeCount = nodeCount;
         this.nodeBudgetBytes = nodeBudgetBytes;
         this.local = local;
         this.useCombiner = useCombiner;
+        this.strategy = strategy;
     }
 
     @Override
@@ -56,7 +68,8 @@ public class DistributedDeduplicator implements Deduplicator {
             }
 
             // 3. move records to their owner
-            new Shuffle(transport).run(nodes);
+            NodePartitioner partitioner = choosePartitioner(nodes);
+            new Shuffle(transport, partitioner).run(nodes);
 
             receivedBytes = measureReceived(nodes);
 
@@ -117,5 +130,16 @@ public class DistributedDeduplicator implements Deduplicator {
                 Files.delete(path); // reverse order: files before the folders that contain them
             }
         }
+    }
+
+    private NodePartitioner choosePartitioner(List<Node> nodes) throws IOException {
+        if (strategy == PartitionStrategy.HASH) {
+            return new HashNodePartitioner();
+        }
+        List<String> samples = new ArrayList<>();
+        for (Node node : nodes) {
+            samples.addAll(new Sampler(SAMPLE_SIZE_PER_NODE, SAMPLE_SEED + node.id()).sample(node.inputFile()));
+        }
+        return new RangePartitioner(RangeBoundaries.fromSample(samples, nodes.size()));
     }
 }

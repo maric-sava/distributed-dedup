@@ -12,6 +12,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import rs.ac.uns.ftn.dedup.core.InMemoryDeduplicator;
+import rs.ac.uns.ftn.dedup.distributed.partition.PartitionStrategy;
 import rs.ac.uns.ftn.dedup.generator.DataGenerator;
 import rs.ac.uns.ftn.dedup.generator.Distribution;
 import rs.ac.uns.ftn.dedup.generator.GeneratorConfig;
@@ -174,5 +175,54 @@ class DistributedDeduplicatorTest {
         assertEquals(Files.size(in), stats.totalReceivedBytes());
         assertTrue(stats.timeMillis() >= 0);
         assertTrue(stats.imbalance() >= 1.0);
+    }
+
+    @Test
+    void rangeMatchesBaselineOnAllDistributions() throws IOException {
+        for (Distribution distribution : Distribution.values()) {
+            for (int nodes : new int[] {1, 2, 4}) {
+                for (boolean combiner : new boolean[] {false, true}) {
+                    Path in = dir.resolve("in.txt");
+                    Path expected = dir.resolve("expected.txt");
+                    Path actual = dir.resolve("actual.txt");
+                    new DataGenerator().generate(new GeneratorConfig(2000, 150, distribution, 3), in);
+                    new InMemoryDeduplicator().dedupe(in, expected);
+
+                    new DistributedDeduplicator(nodes, 1000, new HashPartitionDeduplicator(1000, 4),
+                            combiner, PartitionStrategy.RANGE).dedupe(in, actual);
+
+                    assertEquals(sortedLines(expected), sortedLines(actual),
+                            "nodes=" + nodes + " " + distribution + " combiner=" + combiner);
+                }
+            }
+        }
+    }
+
+    @Test
+    void rangeKeepsZipfLoadReasonablyEven() throws IOException {
+        Path in = dir.resolve("in.txt");
+        Path out = dir.resolve("out.txt");
+        new DataGenerator().generate(new GeneratorConfig(20_000, 500, Distribution.ZIPF, 1), in);
+        DistributedDeduplicator job = new DistributedDeduplicator(
+                4, 1000, new HashPartitionDeduplicator(1000, 4), false, PartitionStrategy.RANGE);
+
+        job.dedupe(in, out);
+
+        assertTrue(job.stats().imbalance() < 1.3, "imbalance: " + job.stats().imbalance());
+    }
+
+    @Test
+    void rangeWithSortGivesGloballySortedOutput() throws IOException {
+        Path in = dir.resolve("in.txt");
+        Path expected = dir.resolve("expected.txt");
+        Path actual = dir.resolve("actual.txt");
+        new DataGenerator().generate(new GeneratorConfig(2000, 150, Distribution.UNIFORM, 1), in);
+        new InMemoryDeduplicator().dedupe(in, expected);
+
+        new DistributedDeduplicator(3, 600, new ExternalSortDeduplicator(600, 3), false, PartitionStrategy.RANGE)
+                .dedupe(in, actual);
+
+        // no sorting of the actual output here: node 0 has the smallest range, node 1 the next one, and so on
+        assertEquals(sortedLines(expected), Files.readAllLines(actual));
     }
 }

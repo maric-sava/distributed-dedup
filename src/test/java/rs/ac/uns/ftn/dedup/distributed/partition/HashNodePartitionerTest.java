@@ -1,4 +1,4 @@
-package rs.ac.uns.ftn.dedup.distributed;
+package rs.ac.uns.ftn.dedup.distributed.partition;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,9 +9,10 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import rs.ac.uns.ftn.dedup.distributed.Node;
 import rs.ac.uns.ftn.dedup.local.hash.LineHash;
 
-class ShuffleSplitterTest {
+class HashNodePartitionerTest {
 
     @TempDir
     Path dir;
@@ -36,7 +37,7 @@ class ShuffleSplitterTest {
         Node source = new Node(0, dir, 1000);
         Path input = writeInput(source, List.of("a"));
 
-        List<Path> parts = new ShuffleSplitter().split(source, input, 4);
+        List<Path> parts = new HashNodePartitioner().split(source, input, 4);
 
         assertEquals(4, parts.size());
         for (Path part : parts) {
@@ -50,12 +51,12 @@ class ShuffleSplitterTest {
         List<String> lines = List.of("a", "b", "c", "a", "d", "b", "e", "a", "f", "g");
         Path input = writeInput(source, lines);
 
-        List<Path> parts = new ShuffleSplitter().split(source, input, 3);
+        List<Path> parts = new HashNodePartitioner().split(source, input, 3);
 
         int total = 0;
         for (int i = 0; i < parts.size(); i++) {
             for (String line : Files.readAllLines(parts.get(i))) {
-                assertEquals(i, LineHash.bucket(line, ShuffleSplitter.SHUFFLE_SEED, 3));
+                assertEquals(i, LineHash.bucket(line, HashNodePartitioner.SHUFFLE_SEED, 3));
                 total++;
             }
         }
@@ -66,7 +67,7 @@ class ShuffleSplitterTest {
     void sameLineGoesToSameNodeFromDifferentSources() throws IOException {
         Node first = new Node(0, dir, 1000);
         Node second = new Node(1, dir, 1000);
-        ShuffleSplitter splitter = new ShuffleSplitter();
+        HashNodePartitioner splitter = new HashNodePartitioner();
 
         List<Path> fromFirst = splitter.split(first, writeInput(first, List.of("a", "b", "c", "d")), 3);
         List<Path> fromSecond = splitter.split(second, writeInput(second, List.of("d", "c", "b", "a")), 3);
