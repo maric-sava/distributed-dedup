@@ -121,4 +121,58 @@ class DistributedDeduplicatorTest {
         assertEquals(3, job.receivedBytesPerNode().size());
         assertEquals(Files.size(in), job.receivedBytesPerNode().stream().mapToLong(Long::longValue).sum());
     }
+
+    @Test
+    void combinerGivesSameResultAndSendsLess() throws IOException {
+        Path in = dir.resolve("in.txt");
+        Path expected = dir.resolve("expected.txt");
+        Path plain = dir.resolve("plain.txt");
+        Path combined = dir.resolve("combined.txt");
+        new DataGenerator().generate(new GeneratorConfig(2000, 150, Distribution.UNIFORM, 1), in);
+        new InMemoryDeduplicator().dedupe(in, expected);
+        DistributedDeduplicator without = new DistributedDeduplicator(4, 1000, new HashPartitionDeduplicator(1000, 4));
+        DistributedDeduplicator with = new DistributedDeduplicator(4, 1000, new HashPartitionDeduplicator(1000, 4), true);
+
+        without.dedupe(in, plain);
+        with.dedupe(in, combined);
+
+        assertEquals(sortedLines(expected), sortedLines(combined));
+        assertTrue(with.bytesSent() < without.bytesSent());
+    }
+
+    @Test
+    void combinerMatchesBaselineOnAllDistributions() throws IOException {
+        for (Distribution distribution : Distribution.values()) {
+            for (int nodes : new int[] {1, 2, 4}) {
+                Path in = dir.resolve("in.txt");
+                Path expected = dir.resolve("expected.txt");
+                Path actual = dir.resolve("actual.txt");
+                new DataGenerator().generate(new GeneratorConfig(2000, 150, distribution, 2), in);
+                new InMemoryDeduplicator().dedupe(in, expected);
+
+                new DistributedDeduplicator(nodes, 1000, new HashPartitionDeduplicator(1000, 4), true)
+                        .dedupe(in, actual);
+
+                assertEquals(sortedLines(expected), sortedLines(actual),
+                        "nodes=" + nodes + " " + distribution);
+            }
+        }
+    }
+
+    @Test
+    void statsDescribeTheLastJob() throws IOException {
+        Path in = dir.resolve("in.txt");
+        Path out = dir.resolve("out.txt");
+        new DataGenerator().generate(new GeneratorConfig(500, 100, Distribution.UNIFORM, 1), in);
+        DistributedDeduplicator job = new DistributedDeduplicator(3, 1000, new HashPartitionDeduplicator(1000, 4));
+
+        job.dedupe(in, out);
+        JobStats stats = job.stats();
+
+        assertEquals(3, stats.receivedBytesPerNode().size());
+        assertEquals(job.bytesSent(), stats.bytesSent());
+        assertEquals(Files.size(in), stats.totalReceivedBytes());
+        assertTrue(stats.timeMillis() >= 0);
+        assertTrue(stats.imbalance() >= 1.0);
+    }
 }

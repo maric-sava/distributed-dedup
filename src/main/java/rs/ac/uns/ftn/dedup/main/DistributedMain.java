@@ -6,14 +6,15 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import rs.ac.uns.ftn.dedup.distributed.DistributedDeduplicator;
+import rs.ac.uns.ftn.dedup.distributed.JobStats;
 import rs.ac.uns.ftn.dedup.local.hash.HashPartitionDeduplicator;
 
 /** Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets> */
 public class DistributedMain {
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 5) {
-            System.err.println("Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets>");
+        if (args.length < 5 || args.length > 6) {
+            System.err.println("Usage: DistributedMain <input> <output> <nodes> <nodeBudgetBytes> <buckets> [combiner]");
             System.exit(1);
         }
         Path input = Path.of(args[0]);
@@ -21,22 +22,19 @@ public class DistributedMain {
         int nodes = Integer.parseInt(args[2]);
         long budget = Long.parseLong(args[3]);
         int buckets = Integer.parseInt(args[4]);
+        boolean combiner = args.length == 6 && args[5].equals("combiner");
 
         DistributedDeduplicator job =
-                new DistributedDeduplicator(nodes, budget, new HashPartitionDeduplicator(budget, buckets));
+                new DistributedDeduplicator(nodes, budget, new HashPartitionDeduplicator(budget, buckets), combiner);
 
-        long start = System.currentTimeMillis();
         job.dedupe(input, output);
-        long time = System.currentTimeMillis() - start;
 
-        List<Long> received = job.receivedBytesPerNode();
-        double average = received.stream().mapToLong(Long::longValue).sum() / (double) nodes;
-        double max = received.stream().mapToLong(Long::longValue).max().orElse(0);
+        JobStats stats = job.stats();
 
-        System.out.println("nodes=" + nodes + " budget=" + budget + " time=" + time + " ms");
+        System.out.println("nodes=" + nodes + " combiner=" + combiner + " budget=" + budget + " time=" + stats.timeMillis() + " ms");
         System.out.println("bytesSent=" + job.bytesSent());
-        System.out.println("receivedPerNode=" + received);
-        System.out.println(String.format(Locale.ROOT, "imbalance(max/average)=%.2f", max / average));
+        System.out.println("receivedPerNode=" + stats.receivedBytesPerNode());
+        System.out.println(String.format(Locale.ROOT, "imbalance(max/average)=%.2f", stats.imbalance()));
         System.out.println("output=" + output + " bytes=" + Files.size(output));
     }
 }
