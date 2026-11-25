@@ -7,9 +7,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * A bookmark in one sorted run file. It remembers the line we are currently
- * looking at, and can move on to the next one.
- * The merge keeps one cursor per run and always asks: "which cursor is on the smallest line?"
+ *  Maintains the current reading state of a sorted run file.
+ *  Holds the current record and advances sequentially through
+ *  the file without loading the entire run into memory.
+ *  Each run has its own cursor during the k-way merge.
  */
 public class RunCursor {
 

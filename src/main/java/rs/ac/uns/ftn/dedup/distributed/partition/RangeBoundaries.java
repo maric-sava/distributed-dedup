@@ -4,16 +4,30 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Cut points that divide the lines into ranges, one range per node. */
+/**
+ * Calculates and stores global range boundaries from the combined samples
+ * of all nodes. For N nodes, N-1 cut points are selected from the sorted
+ * sample to divide the data into approximately balanced ranges.
+ *
+ * All nodes use the same boundaries to determine the destination node
+ * for each input line, ensuring that identical lines are routed to
+ * the same node for subsequent deduplication.
+ */
 public class RangeBoundaries {
 
     private final List<String> boundaries; // sorted, nodeCount - 1 of them
 
     private RangeBoundaries(List<String> boundaries) {
-        this.boundaries = boundaries;
+        this.boundaries = List.copyOf(boundaries);
     }
 
-    /** Cuts the sorted sample into nodeCount groups of about the same size. */
+    /**
+     * Sorts the combined sample and selects nodeCount - 1 cut points
+     * at evenly spaced positions to approximate balanced data ranges.
+     * Duplicate cut points may occur when the sample contains frequent
+     * identical values, resulting in empty or unevenly sized partitions.
+     * This affects load balancing but not deduplication correctness.
+     */
     public static RangeBoundaries fromSample(List<String> sample, int nodeCount) {
         if (nodeCount < 1) {
             throw new IllegalArgumentException("nodeCount must be at least 1: " + nodeCount);
@@ -30,7 +44,11 @@ public class RangeBoundaries {
         return new RangeBoundaries(cuts);
     }
 
-    /** The node that owns this line: how many cut points are smaller than or equal to it. */
+    /**
+     * Determines the destination node by counting the cut points
+     * smaller than or equal to the line. Each crossed boundary
+     * increments the node ID, with equal values routed to the right.
+     */
     public int ownerOf(String line) {
         int owner = 0;
         while (owner < boundaries.size() && line.compareTo(boundaries.get(owner)) >= 0) {

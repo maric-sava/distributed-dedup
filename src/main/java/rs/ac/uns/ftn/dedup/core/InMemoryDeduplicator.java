@@ -9,6 +9,11 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Performs in-memory deduplication using a HashSet.
+ * Serves as a reference implementation for correctness testing.
+ * Assumes that all distinct records fit in available memory.
+ */
 public class InMemoryDeduplicator implements Deduplicator {
     @Override
     public void dedupe(Path input, Path output) throws IOException {

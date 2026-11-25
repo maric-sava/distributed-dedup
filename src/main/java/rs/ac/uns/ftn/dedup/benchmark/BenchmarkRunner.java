@@ -7,7 +7,11 @@ import java.util.List;
 import rs.ac.uns.ftn.dedup.distributed.DistributedDeduplicator;
 import rs.ac.uns.ftn.dedup.distributed.JobStats;
 
-/** Runs every case several times and writes the measurements of each run to the CSV file. */
+/**
+ * Executes benchmark configurations with configurable
+ * warmup and measurement runs.
+ * Records measured job statistics in a CSV file.
+ */
 public class BenchmarkRunner {
 
     private final ResultsCsv csv;

@@ -11,7 +11,10 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Dedupes one bucket with a HashSet, if its distinct lines fit in the memory budget. */
+/**
+ * Performs in-memory deduplication of a single hash bucket
+ * using a HashSet and an estimated memory budget.
+ */
 public class BucketDeduper {
 
     private final long budgetBytes;
@@ -21,9 +24,10 @@ public class BucketDeduper {
     }
 
     /**
-     * Tries to dedupe the bucket in memory. On success writes the distinct lines to out
-     * and returns true. If the distinct lines do not fit the budget, writes nothing
-     * and returns false (the caller must split the bucket further).
+     * Attempts to deduplicate a bucket within the estimated memory budget.
+     * On success, writes all distinct records and returns true.
+     * If further partitioning is required, returns false without
+     * writing any records to the output.
      */
     public boolean tryDedupe(Path bucket, Writer out) throws IOException {
         Set<String> seen = new HashSet<>();
@@ -33,15 +37,18 @@ public class BucketDeduper {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (seen.add(line)) {
+                    // Account for memory only when a new distinct record is inserted.
                     used += MemoryModel.hashEntryBytes(line);
-                    // Too big: give up. But with only one line we accept it, because
-                    // splitting a bucket that holds a single line would never help.
+                    // Allow a single distinct record to exceed the estimated budget,
+                    // since further partitioning cannot reduce its memory footprint.
+                    // Assumes that an individual record fits in available JVM memory.
                     if (used > budgetBytes && seen.size() >= 2) {
                         return false;
                     }
                 }
             }
         }
+        // Write results only after successful in-memory deduplication.
         for (String line : seen) {
             out.write(line);
             out.write('\n');

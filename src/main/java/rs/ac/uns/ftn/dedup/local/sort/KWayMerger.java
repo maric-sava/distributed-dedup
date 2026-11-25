@@ -11,37 +11,42 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 /**
- * Phase 2 of external sort: merges sorted runs into one sorted file without duplicates.
- * Example:  run 0: b c d,  run 1: a e f,  run 2: b   ->   a b c d e f
+ * Merges sorted runs using a min-heap while eliminating duplicate
+ * records. Supports multi-pass merging to limit the number of
+ * simultaneously open run files.
  */
 public class KWayMerger {
 
     /**
-     * Merges ALL the given runs in one go.
-     * Idea: keep one cursor per run. Repeatedly take the cursor on the smallest line,
-     * write that line, move that cursor forward.
+     * Merges the given sorted runs in a single pass using a min-heap.
+     * Maintains one cursor per run and eliminates consecutive duplicates
+     * while producing a globally sorted output.
      */
     public void merge(List<Path> runs, Path output) throws IOException {
 
         List<RunCursor> cursors = new ArrayList<>();
 
-        // The heap is a box of cursors that always gives out the cursor on the SMALLEST line.
-        // "Comparator.comparing(c -> c.currentLine())" tells it how to order cursors.
+        // Order cursors by the smallest unprocessed record in each run.
         PriorityQueue<RunCursor> heap = new PriorityQueue<>(Comparator.comparing(RunCursor::currentLine));
 
         try (BufferedWriter out = Files.newBufferedWriter(output, StandardCharsets.UTF_8)) {
             for (Path run : runs) {
                 RunCursor cursor = new RunCursor(run);
+                // Track all cursors for resource cleanup.
                 cursors.add(cursor);
-                if (!cursor.isFinished()) { // only non-empty files
+                // Only include non-exhausted runs in the heap.
+                if (!cursor.isFinished()) {
                     heap.add(cursor);
                 }
             }
 
             String last = null;
             while (!heap.isEmpty()) {
-                RunCursor smallest = heap.poll(); // take the currsor with the smallest line
+                // Retrieve the cursor with the smallest remaining record.
+                RunCursor smallest = heap.poll();
                 String line = smallest.currentLine();
+                // Identical records are consecutive in the sorted stream,
+                // so only the last written record needs to be retained.
                 if (!line.equals(last)) {
                     out.write(smallest.currentLine());
                     out.write('\n');
@@ -60,12 +65,9 @@ public class KWayMerger {
     }
 
     /**
-     * Merges many runs in PASSES, so that at most maxRunsPerMerge files are open at once.
-     * Example with 5 runs and maxRunsPerMerge = 2:
-     *   pass 0: (r0,r1) (r2,r3) (r4)  ->  3 bigger runs
-     *   pass 1: (m0,m1) (m2)          ->  2 bigger runs
-     *   final:  (m0,m1)               ->  the output
-     * The input runs are deleted as they are merged.
+     * Merges sorted runs in multiple passes using a bounded merge fan-in.
+     * Each intermediate pass reduces the number of remaining runs.
+     * Input runs are deleted after their successful merge.
      */
     public void mergeInPasses(List<Path> runs, Path output, int maxRunsPerMerge) throws IOException {
         if (maxRunsPerMerge < 2) {
@@ -73,20 +75,25 @@ public class KWayMerger {
         }
         Path folder = output.toAbsolutePath().getParent();
         List<Path> current = new ArrayList<>(runs);
-        int fileCounter = 0;
+        int passIndex = 0;
 
+        // Perform intermediate merge passes until the remaining runs
+        // can be merged without exceeding the configured merge fan-in.
         while (current.size() > maxRunsPerMerge) {
             List<Path> next = new ArrayList<>();
             for (int start = 0; start < current.size(); start += maxRunsPerMerge) {
                 int end = Math.min(start + maxRunsPerMerge, current.size());
-                Path merged = folder.resolve("pass-" + fileCounter + "-" + start + "-" + end + ".txt");
+                Path merged = folder.resolve("pass-" + passIndex + "-" + start + "-" + end + ".txt");
+                // Merge a bounded group of runs and delete the consumed files.
                 mergeAndDelete(current.subList(start, end), merged);
                 next.add(merged);
             }
+            // Use the newly generated runs as input for the next pass.
             current = next;
-            fileCounter++;
+            passIndex++;
         }
-        mergeAndDelete(current, output);    // at most maxRunsPerMerge runs left: the final merge
+        //  at most maxRunsPerMerge runs left: the final merge
+        mergeAndDelete(current, output);
     }
 
     // Merges a group of runs into target, then deletes the group's files.

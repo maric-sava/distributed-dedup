@@ -9,11 +9,13 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * External merge sort, in two phases:
- *   1. Make runs: read as many lines as fit in the memory budget, sort them,
- *      write them to a file (a "run"). Repeat until the input ends.
- *   2. Merge the runs into one sorted file, writing each line only once.
- * Duplicates end up next to each other in sorted order, so the merge can drop them.
+ * Performs external merge sort-based deduplication in two phases:
+ * 1. Run generation: sorts input chunks in memory according to
+ *    an estimated memory budget and writes them to disk.
+ * 2. Merge: combines sorted runs using bounded multi-pass merging
+ *    while eliminating duplicate records.
+ *
+ * Produces a globally sorted, deduplicated output file.
  */
 public class ExternalSortDeduplicator implements Deduplicator {
 

@@ -13,9 +13,10 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Phase 1 of external sort: cuts the input into runs.
- * A run = as many lines as fit in the memory budget, sorted, written to its own file.
- * Example with room for 3 lines:  d b c a e  ->  run 0: b c d,  run 1: a e
+ * Implements the run generation phase of external merge sort.
+ * Reads the input in memory-bounded chunks, sorts each chunk
+ * in memory and writes it to a separate run file.
+ * Duplicate records are preserved during this phase.
  */
 public class RunWriter {
 
@@ -26,10 +27,11 @@ public class RunWriter {
     }
 
     /**
-     * Makes ONE run: reads lines until the budget is used up (or the input ends),
-     * sorts them and writes them to runFile.
-     * Returns how many lines it wrote; 0 means the input was already finished.
-     * The same reader is passed on every call, so each call continues where the last stopped.
+     * Reads records until the estimated memory usage reaches or
+     * exceeds the configured budget, or the input is exhausted.
+     * Sorts the records and writes them to a single run file.
+     * Returns the number of records written, or zero if none remain.
+     * The reader retains its position between calls.
      */
     public int writeRun(BufferedReader reader, Path runFile) throws IOException {
         List<String> lines = new ArrayList<>();
@@ -37,6 +39,7 @@ public class RunWriter {
         String line;
         while (used < budgetBytes && (line = reader.readLine()) != null) {
             lines.add(line);
+            // Estimate the memory footprint of the retained record.
             used += MemoryModel.sortEntryBytes(line);
         }
         if(lines.isEmpty()) {
@@ -53,9 +56,9 @@ public class RunWriter {
     }
 
     /**
-     * Makes ALL runs: calls writeRun again and again until the input is finished.
-     * The files are named run-0.txt, run-1.txt, ... inside runDir.
-     * Returns the list of run files, in order.
+     * Generates sorted runs until the input is exhausted.
+     * Names the files sequentially (run-0.txt, run-1.txt, ...)
+     * and returns their paths in creation order.
      */
     public List<Path> writeAllRuns(Path input, Path runDir) throws IOException {
         Files.createDirectories(runDir);

@@ -4,8 +4,10 @@ import java.util.Arrays;
 import java.util.Random;
 
 /**
- * Skewed ids: id 0 is the most frequent, id 1 half as frequent (for exponent 1.0),
- * id 2 a third, and so on. Higher exponent = more skew.
+ * Generates IDs according to a Zipf distribution.
+ * Uses cumulative probabilities and binary search
+ * for inverse transform sampling.
+ * Higher exponents produce greater data skew.
  */
 public class ZipfDistribution implements IdSource {
 

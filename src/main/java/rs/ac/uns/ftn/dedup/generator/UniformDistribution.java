@@ -2,6 +2,10 @@ package rs.ac.uns.ftn.dedup.generator;
 
 import java.util.Random;
 
+/**
+ * Generates random IDs with equal probability
+ * across the configured range of possible values.
+ */
 public class UniformDistribution implements IdSource {
 
     private final int distinct;

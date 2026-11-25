@@ -7,8 +7,11 @@ import java.nio.file.Path;
 import rs.ac.uns.ftn.dedup.core.Deduplicator;
 
 /**
- * Removes duplicate lines using hash partitioning:
- * try a HashSet, and if it does not fit the budget, split by hash and repeat on each part.
+ * Performs external hash-based deduplication by recursively
+ * partitioning data that exceeds the estimated memory budget.
+ * Delegates recursive processing to RecursiveHashDeduper
+ * and produces a deduplicated output file without guaranteeing
+ * record ordering.
  */
 public class HashPartitionDeduplicator implements Deduplicator {
 

@@ -7,9 +7,9 @@ import java.nio.file.StandardCopyOption;
 import rs.ac.uns.ftn.dedup.core.Deduplicator;
 
 /**
- * Runs on one node before the shuffle: replaces the node's input with its distinct lines,
- * so less data has to be sent. It only sees this node's data, so duplicates that live on
- * different nodes are still removed later, by the final dedupe.
+ * Performs optional local deduplication before the shuffle to reduce
+ * data transfer volume. Duplicates across different nodes are
+ * removed during destination-local deduplication.
  */
 public class Combiner {
 

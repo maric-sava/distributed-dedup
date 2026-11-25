@@ -9,9 +9,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Splits a file into bucket files. Equal lines always end up in the same bucket. */
+/**
+ * Partitions an input file into hash-based buckets.
+ * Ensures that identical records are assigned to the same bucket
+ * without performing deduplication.
+ */
 public class Partitioner {
 
+    /**
+     * Streams the input file and distributes records across bucket files
+     * using the specified hash seed and bucket count.
+     * Returns the bucket file paths in bucket index order.
+     */
     public List<Path> partition(Path input, Path folder, int buckets, int seed) throws IOException {
         Files.createDirectories(folder);
         List<Path> files = new ArrayList<>();
@@ -24,6 +33,7 @@ public class Partitioner {
             }
             String line;
             while ((line = reader.readLine()) != null) {
+                // Select the destination bucket based on the record's hash.
                 BufferedWriter writer = writers.get(LineHash.bucket(line, seed, buckets));
                 writer.write(line);
                 writer.write('\n');

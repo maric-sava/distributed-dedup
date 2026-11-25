@@ -10,9 +10,17 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Simulates data that already lives on the nodes: deals the lines to the nodes one by one. */
+/**
+ * Simulates an initially distributed dataset by spreading
+ * records across nodes in a round-robin manner.
+ * Used for simulation setup, independently of deduplication.
+ */
 public class InputSpreader {
 
+    /**
+     * Streams the input file and distributes its records evenly
+     * across nodes without loading the entire dataset into memory.
+     */
     public void spread(Path input, List<Node> nodes) throws IOException {
         List<BufferedWriter> writers = new ArrayList<>();
         try (BufferedReader reader = Files.newBufferedReader(input)) {

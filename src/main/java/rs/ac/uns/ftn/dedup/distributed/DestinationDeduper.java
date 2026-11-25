@@ -9,6 +9,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * Deduplicates all partitions assigned to a destination node,
+ * independently of the partitioning strategy and local deduplication algorithm.
+ */
 public class DestinationDeduper {
 
     private final Deduplicator local;
@@ -17,6 +21,10 @@ public class DestinationDeduper {
         this.local = local;
     }
 
+    /**
+     * Combines incoming partitions into a temporary file,
+     * performs local deduplication and removes the intermediate file.
+     */
     public Path run(Node node) throws IOException {
         Path merged = node.folder().resolve("merged.txt");
         concatenate(node.incomingFolder(), merged);
@@ -25,6 +33,10 @@ public class DestinationDeduper {
         return node.outputFile();
     }
 
+    /**
+     * Concatenates incoming partition files in deterministic filename order
+     * without sorting or deduplicating their contents.
+     */
     private void concatenate(Path folder, Path target) throws IOException {
         List<Path> files;
         try (Stream<Path> listing = Files.list(folder)) {

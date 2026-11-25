@@ -12,7 +12,10 @@ import rs.ac.uns.ftn.dedup.core.Deduplicator;
 import rs.ac.uns.ftn.dedup.distributed.partition.*;
 import rs.ac.uns.ftn.dedup.distributed.setup.InputSpreader;
 
-/** Distributed deduplication on simulated nodes: spread, shuffle by hash, dedupe on every node. */
+/**
+ * Coordinates distributed deduplication across simulated nodes
+ * using configurable partitioning and local deduplication strategies.
+ */
 public class DistributedDeduplicator implements Deduplicator {
 
     private final int nodeCount;
@@ -23,7 +26,9 @@ public class DistributedDeduplicator implements Deduplicator {
     private final boolean useCombiner;
     private long timeMillis;
 
+    // Maximum samples per node; balances sampling accuracy and resource overhead.
     private static final int SAMPLE_SIZE_PER_NODE = 1000;
+    // Fixed base seed for reproducibility, offset by node ID to vary sampling across nodes.
     private static final long SAMPLE_SEED = 42;
 
     private final PartitionStrategy strategy;
@@ -45,43 +50,51 @@ public class DistributedDeduplicator implements Deduplicator {
         this.strategy = strategy;
     }
 
+    /**
+     * Orchestrates distributed deduplication across simulated nodes
+     * using the configured partitioning strategy and local
+     * deduplication algorithm.
+     */
     @Override
     public void dedupe(Path input, Path output) throws IOException {
         long start = System.nanoTime();
         transport = new Transport();
         Path cluster = Files.createTempDirectory(output.toAbsolutePath().getParent(), "cluster-");
         try {
-            // 1. create the computers
+            // 1. Initialize the simulated cluster nodes.
             List<Node> nodes = new ArrayList<>();
             for (int id = 0; id < nodeCount; id++) {
                 nodes.add(new Node(id, cluster, nodeBudgetBytes));
             }
-            // 2. put the data on them
+            // 2. Simulate the initial distribution of input data.
             new InputSpreader().spread(input, nodes);
 
-            // 2a. deduplicate each locally if using combiner
+            // 3. Optionally remove local duplicates to reduce shuffle volume.
             if (useCombiner) {
                 Combiner combiner = new Combiner(local);
                 for (Node node : nodes) {
-                    combiner.run(node); // each node removes its own duplicates before sending
+                    combiner.run(node);
                 }
             }
 
-            // 3. move records to their owner
+            // 4. Select the partitioning strategy and redistribute records
+            //    so that identical records reach the same destination node.
             NodePartitioner partitioner = choosePartitioner(nodes);
             new Shuffle(transport, partitioner).run(nodes);
 
+            // Measure the data volume assigned to each destination node.
             receivedBytes = measureReceived(nodes);
 
-            // 4. each computer dedupes
+            // 5. Deduplicate the records assigned to each destination node.
             DestinationDeduper destination = new DestinationDeduper(local);
             for (Node node : nodes) {
                 destination.run(node);
             }
 
-            // 5. join the results
+            // 6. Concatenate the deduplicated outputs into the final result.
             combine(nodes, output);
         } finally {
+            // 7. Clean up the temporary cluster workspace.
             deleteRecursively(cluster);
             timeMillis = (System.nanoTime() - start) / 1_000_000;
         }
@@ -116,6 +129,11 @@ public class DistributedDeduplicator implements Deduplicator {
         return sizes;
     }
 
+    /**
+     * Concatenates the already globally deduplicated node outputs
+     * into a single result file. This is an output assembly step,
+     * not a further deduplication stage.
+     */
     private void combine(List<Node> nodes, Path output) throws IOException {
         try (OutputStream out = Files.newOutputStream(output)) {
             for (Node node : nodes) {
@@ -124,6 +142,9 @@ public class DistributedDeduplicator implements Deduplicator {
         }
     }
 
+    /**
+     * Removes the temporary cluster workspace and its contents.
+     */
     private void deleteRecursively(Path folder) throws IOException {
         try (Stream<Path> paths = Files.walk(folder)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
@@ -132,12 +153,18 @@ public class DistributedDeduplicator implements Deduplicator {
         }
     }
 
+    /**
+     * Selects the configured partitioning strategy.
+     * For range partitioning, collects samples from all nodes
+     * to calculate shared global range boundaries.
+     */
     private NodePartitioner choosePartitioner(List<Node> nodes) throws IOException {
         if (strategy == PartitionStrategy.HASH) {
             return new HashNodePartitioner();
         }
         List<String> samples = new ArrayList<>();
         for (Node node : nodes) {
+            // Collect a reproducible, node-specific sample for global range boundary calculation.
             samples.addAll(new Sampler(SAMPLE_SIZE_PER_NODE, SAMPLE_SEED + node.id()).sample(node.inputFile()));
         }
         return new RangePartitioner(RangeBoundaries.fromSample(samples, nodes.size()));

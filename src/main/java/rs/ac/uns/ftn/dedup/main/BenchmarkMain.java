@@ -15,7 +15,9 @@ import rs.ac.uns.ftn.dedup.distributed.partition.PartitionStrategy;
 /** Usage: BenchmarkMain <dataFolder> <resultsCsv> [warmups] [repeats]. Defaults: 1 warm-up, 5 recorded runs. */
 public class BenchmarkMain {
 
+    // Estimated memory budget for local deduplication.
     private static final long BUDGET_BYTES = 1_000_000;
+    // Number of buckets per local hash partitioning step.
     private static final int BUCKETS = 16;
 
     public static void main(String[] args) throws IOException {
@@ -47,6 +49,12 @@ public class BenchmarkMain {
         System.out.println("Done: " + cases.size() + " cases, results in " + csvFile);
     }
 
+    /**
+     * Builds the experimental grid for comparing distributed
+     * partitioning strategies, node counts and the Combiner.
+     * Includes a controlled comparison of local deduplication
+     * algorithms using four nodes and hash partitioning.
+     */
     private static List<BenchmarkCase> buildGrid(List<Path> inputs) {
         List<BenchmarkCase> cases = new ArrayList<>();
         for (Path input : inputs) {

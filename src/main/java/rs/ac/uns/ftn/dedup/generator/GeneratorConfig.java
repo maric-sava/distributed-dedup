@@ -1,5 +1,10 @@
 package rs.ac.uns.ftn.dedup.generator;
 
+/**
+ * Defines dataset generation parameters, including the total
+ * number of records, the number of possible distinct values,
+ * the value distribution and the seed for reproducibility.
+ */
 public record GeneratorConfig(long rows, int distinct, Distribution distribution, long seed) {
 
     public GeneratorConfig {

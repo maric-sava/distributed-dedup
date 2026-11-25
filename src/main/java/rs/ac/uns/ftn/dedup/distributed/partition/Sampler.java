@@ -19,6 +19,12 @@ public class Sampler {
         this.seed = seed;
     }
 
+    /**
+     * Performs reservoir sampling by reading the input file line by line.
+     * Retains at most sampleSize randomly selected lines, giving each input
+     * line an equal probability of being selected without loading the
+     * entire file into memory. Uses a fixed seed for reproducibility.
+     */
     public List<String> sample(Path file) throws IOException {
         Random random = new Random(seed);
         List<String> reservoir = new ArrayList<>();

@@ -16,7 +16,7 @@ public class HashNodePartitioner implements NodePartitioner {
 
     @Override
     public List<Path> split(Node source, Path input, int nodeCount) throws IOException {
-        Path outgoing = source.folder().resolve("outgoing");
+        Path outgoing = source.outgoingFolder();
         Files.createDirectories(outgoing);
         return partitioner.partition(input, outgoing, nodeCount, SHUFFLE_SEED);
     }

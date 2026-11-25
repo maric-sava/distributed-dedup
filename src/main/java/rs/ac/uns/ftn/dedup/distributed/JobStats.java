@@ -2,7 +2,11 @@ package rs.ac.uns.ftn.dedup.distributed;
 
 import java.util.List;
 
-/** The measurements of one distributed job. */
+/**
+ * Captures distributed job metrics, including simulated
+ * data transfer volume, per-node received data volume
+ * and execution time.
+ */
 public record JobStats(long bytesSent, List<Long> receivedBytesPerNode, long timeMillis) {
 
     public JobStats {
@@ -13,7 +17,11 @@ public record JobStats(long bytesSent, List<Long> receivedBytesPerNode, long tim
         return receivedBytesPerNode.stream().mapToLong(Long::longValue).sum();
     }
 
-    /** Busiest node divided by the average node. 1.0 means perfectly even. */
+    /**
+     * Calculates the ratio of the maximum to the average
+     * received data volume per node.
+     * A value of 1.0 indicates perfect partition balance.
+     */
     public double imbalance() {
         long total = totalReceivedBytes();
         if (total == 0) {

@@ -9,7 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import rs.ac.uns.ftn.dedup.distributed.Node;
 
-/** Splits a node's file by ranges of lines: part i holds the lines that node i owns. */
+/**
+ * Partitions a node's data using shared global range boundaries,
+ * ensuring that identical lines are routed to the same destination node.
+ */
 public class RangePartitioner implements NodePartitioner {
 
     private final RangeBoundaries boundaries; // the same for every node, computed from the samples
@@ -18,12 +21,17 @@ public class RangePartitioner implements NodePartitioner {
         this.boundaries = boundaries;
     }
 
+    /**
+     * Reads the input file line by line and writes each line to the
+     * outgoing partition determined by its range boundaries.
+     * Returns the partition file paths ordered by destination node ID.
+     */
     @Override
     public List<Path> split(Node source, Path input, int nodeCount) throws IOException {
         if (boundaries.boundaries().size() > nodeCount - 1) {
             throw new IllegalArgumentException("The boundaries were made for more than " + nodeCount + " nodes");
         }
-        Path outgoing = source.folder().resolve("outgoing");
+        Path outgoing = source.outgoingFolder();
         Files.createDirectories(outgoing);
 
         List<Path> parts = new ArrayList<>();

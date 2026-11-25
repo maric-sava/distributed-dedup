@@ -4,6 +4,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * Represents a simulated distributed processing node with
+ * its own working directory and memory budget.
+ * Manages paths to its local input, incoming and outcoming
+ * partitions and deduplicated output.
+ */
 public class Node {
 
     private final int id;
@@ -31,6 +37,10 @@ public class Node {
 
     public Path incomingFolder() {
         return folder.resolve("incoming");
+    }
+
+    public Path outgoingFolder() {
+        return folder.resolve("outgoing");
     }
 
     public Path inputFile() {

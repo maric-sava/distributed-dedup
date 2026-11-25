@@ -8,43 +8,56 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Dedupes a file with a HashSet. If the distinct lines do not fit the memory budget,
- * splits the file into buckets with a new seed and handles each bucket the same way.
+ * Performs recursive hash-based deduplication.
+ * Buckets that exceed the estimated memory budget are
+ * repartitioned using a different seed until they can
+ * be deduplicated in memory or the recursion limit is reached.
  */
 public class RecursiveHashDeduper {
 
-    private static final int MAX_DEPTH = 10; // maximum number of splits one line can go through
+    // Maximum repartitioning depth to prevent unbounded recursion.
+    private static final int MAX_DEPTH = 10;
 
     private final BucketDeduper bucketDeduper;
     private final Partitioner partitioner = new Partitioner();
-    private final int buckets; // how many pieces one split makes
+    // Number of child buckets created during each split
+    private final int buckets;
 
     public RecursiveHashDeduper(long budgetBytes, int buckets) {
         this.bucketDeduper = new BucketDeduper(budgetBytes);
         this.buckets = buckets;
     }
 
-    /** Writes the distinct lines of file to out. */
+    /**
+     * Writes all distinct records to the supplied writer,
+     * starting recursive processing at depth zero.
+     */
     public void dedupe(Path file, Writer out) throws IOException {
         dedupe(file, out, 0);
     }
 
     private void dedupe(Path file, Writer out, int depth) throws IOException {
         if (bucketDeduper.tryDedupe(file, out)) {
-            return; // it fit in memory, nothing more to do
+            // Deduplication succeeded without further partitioning.
+            return;
         }
+        // Stop recursion if repeated partitioning fails to produce
+        // buckets that fit within the estimated memory budget.
         if (depth >= MAX_DEPTH) {
             throw new IllegalStateException("Still too big after " + MAX_DEPTH
                     + " splits. The lines probably share the same hash.");
         }
-        // Too big: split with a NEW seed (depth + 1), so the lines spread out differently.
+        // Repartition the oversized bucket using a depth-dependent seed
+        // to attempt a different distribution of records.
         Path folder = Files.createTempDirectory(file.toAbsolutePath().getParent(), "split-");
         try {
             List<Path> parts = partitioner.partition(file, folder, buckets, depth + 1);
+            // Recursively process each child bucket using the shared output writer.
             for (Path part : parts) {
-                dedupe(part, out, depth + 1); // same procedure on every part
+                dedupe(part, out, depth + 1);
             }
         } finally {
+            // Remove temporary partitions even if recursive processing fails.
             deleteFolder(folder);
         }
     }

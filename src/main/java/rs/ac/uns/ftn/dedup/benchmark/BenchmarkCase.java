@@ -11,6 +11,7 @@ import rs.ac.uns.ftn.dedup.local.sort.ExternalSortDeduplicator;
 public record BenchmarkCase(Path input, int nodes, LocalAlgorithm local, boolean combiner,
                             PartitionStrategy strategy, long budgetBytes, int buckets) {
 
+    // Maximum number of sorted run files merged simultaneously.
     private static final int MAX_RUNS_PER_MERGE = 10;
 
     /** Creates a fresh job. A job keeps the statistics of its last run, so every run gets its own. */
